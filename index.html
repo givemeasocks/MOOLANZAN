@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>물 한 잔 카운터</title>
+
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#2660C4">
+
+<link rel="apple-touch-icon" href="./icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="물한잔">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    min-height: 100%;
+    background: oklch(0.96 0.01 250);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+
+  @keyframes wc-pop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.12); } 100% { transform: scale(1); opacity: 1; } }
+
+  /* ---------- iOS device frame ---------- */
+  .ios-device {
+    width: 402px;
+    height: 874px;
+    border-radius: 48px;
+    overflow: hidden;
+    position: relative;
+    background: #F2F2F7;
+    box-shadow: 0 40px 80px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.12);
+    font-family: -apple-system, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .ios-island {
+    position: absolute;
+    top: 11px; left: 50%; transform: translateX(-50%);
+    width: 126px; height: 37px; border-radius: 24px;
+    background: #000; z-index: 50;
+  }
+  .ios-statusbar {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+    display: flex; gap: 154px; align-items: center; justify-content: center;
+    padding: 21px 24px 19px;
+  }
+  .ios-statusbar .time {
+    flex: 1; height: 22px; display: flex; align-items: center; justify-content: center;
+    padding-top: 1.5px;
+    font-family: -apple-system, "SF Pro", system-ui;
+    font-weight: 590; font-size: 17px; line-height: 22px; color: #000;
+  }
+  .ios-statusbar .icons {
+    flex: 1; height: 22px; display: flex; align-items: center; justify-content: center;
+    gap: 7px; padding-top: 1px; padding-right: 1px;
+  }
+  .ios-home-indicator {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 60;
+    height: 34px; display: flex; justify-content: center; align-items: flex-end;
+    padding-bottom: 8px; pointer-events: none;
+  }
+  .ios-home-indicator .bar {
+    width: 139px; height: 5px; border-radius: 100px;
+    background: rgba(0,0,0,0.25);
+  }
+
+  /* ---------- app screen ---------- */
+  .screen {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, oklch(0.94 0.04 235) 0%, oklch(0.97 0.015 235) 40%);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .main-view {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 66px 24px 0;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .eyebrow {
+    font-family: 'Gaegu', cursive;
+    font-size: 20px;
+    color: oklch(0.45 0.09 235);
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .count-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 2px;
+  }
+  .count-num {
+    font-size: 76px;
+    font-weight: 900;
+    color: oklch(0.4 0.13 235);
+    line-height: 1;
+    letter-spacing: -2px;
+  }
+  .count-goal {
+    font-size: 28px;
+    font-weight: 700;
+    color: oklch(0.5 0.1 235);
+  }
+
+  .status-line {
+    font-size: 14px;
+    color: oklch(0.55 0.03 235);
+    margin-bottom: 14px;
+  }
+
+  .glass-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px 10px;
+    width: 100%;
+    max-width: 300px;
+    margin-bottom: 8px;
+  }
+  .glass-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .glass-wrap {
+    position: relative;
+    width: 32px; height: 44px;
+    border-radius: 4px 4px 8px 8px;
+    border: 2.5px solid oklch(0.55 0.08 235);
+    background: oklch(0.98 0.01 235);
+    overflow: hidden;
+  }
+  .glass-fill {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    height: 0%;
+    background: linear-gradient(180deg, oklch(0.72 0.13 235), oklch(0.58 0.15 235));
+    transition: height 0.35s ease-out;
+  }
+  .glass-wrap.filled .glass-fill { height: 100%; }
+  .glass-drop {
+    position: absolute; inset: 0;
+    display: none;
+    align-items: center; justify-content: center;
+    font-size: 15px;
+  }
+  .glass-wrap.filled .glass-drop { display: flex; }
+
+  .cup-hint {
+    font-family: 'Gaegu', cursive;
+    font-size: 15px;
+    color: oklch(0.5 0.08 235);
+    text-align: center;
+    margin-top: auto;
+    padding-bottom: 6px;
+  }
+
+  .actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 0 24px 28px;
+  }
+  .btn-add {
+    border: none;
+    border-radius: 20px;
+    background: linear-gradient(180deg, oklch(0.62 0.14 235), oklch(0.52 0.15 240));
+    color: #fff;
+    font-family: 'Gaegu', cursive;
+    font-weight: 700;
+    font-size: 24px;
+    padding: 18px 0;
+    box-shadow: 0 8px 20px oklch(0.55 0.15 235 / 0.35);
+    cursor: pointer;
+  }
+  .btn-add:active { transform: scale(0.98); }
+  .btn-reset {
+    border: none;
+    background: transparent;
+    color: oklch(0.55 0.03 235);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+    padding: 8px 0;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: oklch(0.75 0.02 235);
+  }
+
+  /* ---------- celebration overlay ---------- */
+  .celebration {
+    position: absolute; inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, oklch(0.55 0.14 235), oklch(0.42 0.15 245));
+    padding: 32px;
+    text-align: center;
+    gap: 6px;
+  }
+  .celebration.show { display: flex; }
+  .celebration .emoji { font-size: 64px; animation: wc-pop 0.5s ease-out; }
+  .celebration .title { font-family: 'Gaegu', cursive; font-weight: 700; font-size: 34px; color: #fff; animation: wc-pop 0.5s ease-out; }
+  .celebration .desc { font-size: 16px; color: oklch(0.95 0.02 235); margin-top: 4px; line-height: 1.6; }
+  .celebration .hearts { display: flex; gap: 6px; margin-top: 18px; }
+  .celebration .hearts span { font-size: 20px; }
+  .btn-continue {
+    margin-top: 28px;
+    border: none;
+    border-radius: 20px;
+    background: #fff;
+    color: oklch(0.45 0.14 235);
+    font-family: 'Gaegu', cursive;
+    font-weight: 700;
+    font-size: 20px;
+    padding: 14px 36px;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+  }
+  .btn-reset-dark {
+    margin-top: 10px;
+    border: none;
+    background: transparent;
+    color: oklch(0.85 0.03 235);
+    font-size: 13px;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  @media (max-width: 460px) {
+    .ios-device { width: 100vw; height: 100vh; border-radius: 0; box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="ios-device">
+  <div class="ios-island"></div>
+  <div class="ios-statusbar">
+    <div class="time">9:41</div>
+    <div class="icons">
+      <svg width="19" height="12" viewBox="0 0 19 12">
+        <rect x="0" y="7.5" width="3.2" height="4.5" rx="0.7" fill="#000"/>
+        <rect x="4.8" y="5" width="3.2" height="7" rx="0.7" fill="#000"/>
+        <rect x="9.6" y="2.5" width="3.2" height="9.5" rx="0.7" fill="#000"/>
+        <rect x="14.4" y="0" width="3.2" height="12" rx="0.7" fill="#000"/>
+      </svg>
+      <svg width="17" height="12" viewBox="0 0 17 12">
+        <path d="M8.5 3.2C10.8 3.2 12.9 4.1 14.4 5.6L15.5 4.5C13.7 2.7 11.2 1.5 8.5 1.5C5.8 1.5 3.3 2.7 1.5 4.5L2.6 5.6C4.1 4.1 6.2 3.2 8.5 3.2Z" fill="#000"/>
+        <path d="M8.5 6.8C9.9 6.8 11.1 7.3 12 8.2L13.1 7.1C11.8 5.9 10.2 5.1 8.5 5.1C6.8 5.1 5.2 5.9 3.9 7.1L5 8.2C5.9 7.3 7.1 6.8 8.5 6.8Z" fill="#000"/>
+        <circle cx="8.5" cy="10.5" r="1.5" fill="#000"/>
+      </svg>
+      <svg width="27" height="13" viewBox="0 0 27 13">
+        <rect x="0.5" y="0.5" width="23" height="12" rx="3.5" stroke="#000" stroke-opacity="0.35" fill="none"/>
+        <rect x="2" y="2" width="20" height="9" rx="2" fill="#000"/>
+        <path d="M25 4.5V8.5C25.8 8.2 26.5 7.2 26.5 6.5C26.5 5.8 25.8 4.8 25 4.5Z" fill="#000" fill-opacity="0.4"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="screen">
+    <div class="main-view">
+      <div class="eyebrow">오늘도 사막 탈출 중</div>
+      <div class="count-row">
+        <span class="count-num" id="cupCount">0</span>
+        <span class="count-goal">/ 8잔</span>
+      </div>
+      <div class="status-line" id="statusLine">8잔 남았어요, 힘내요</div>
+
+      <div class="glass-grid" id="glassGrid"></div>
+
+      <div class="cup-hint" id="cupHint">아직 시작 전... 목이 마를 텐데요?</div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-add" id="addCupBtn">물 한 잔 꼴딱 💧</button>
+      <button class="btn-reset" id="resetBtn1">오늘 기록 지우기</button>
+    </div>
+
+    <div class="celebration" id="celebration">
+      <div class="emoji">🎉</div>
+      <div class="title">사막 탈출 성공!</div>
+      <div class="desc">8잔 완주. 오늘 몸속 수분은<br/>완전 럭셔리 스파 상태입니다 🛁</div>
+      <div class="hearts" id="hearts"></div>
+      <button class="btn-continue" id="closeCelebrationBtn">계속 마시기</button>
+      <button class="btn-reset-dark" id="resetBtn2">오늘 기록 지우기</button>
+    </div>
+  </div>
+
+  <div class="ios-home-indicator"><div class="bar"></div></div>
+</div>
+
+<script>
+const GOAL = 8;
+const HINTS = [
+  '아직 시작 전... 목이 마를 텐데요?',
+  '한 잔 완료! 워밍업 끝~',
+  '두 잔째, 물 요정이 미소짓고 있어요',
+  '벌써 세 잔? 오늘 컨디션 최상',
+  '반의 반... 아니 절반 목전!',
+  '다섯 잔, 이 정도면 인간 정수기',
+  '여섯 잔! 사막도 울고 갈 기세',
+  '한 잔만 더 하면 전설이 됩니다',
+];
+
+let cupCount = 0;
+let celebrating = false;
+
+const cupCountEl = document.getElementById('cupCount');
+const statusLineEl = document.getElementById('statusLine');
+const cupHintEl = document.getElementById('cupHint');
+const glassGridEl = document.getElementById('glassGrid');
+const celebrationEl = document.getElementById('celebration');
+const heartsEl = document.getElementById('hearts');
+
+for (let i = 0; i < GOAL; i++) {
+  const cell = document.createElement('div');
+  cell.className = 'glass-cell';
+  cell.innerHTML = '<div class="glass-wrap"><div class="glass-fill"></div><div class="glass-drop">💧</div></div>';
+  glassGridEl.appendChild(cell);
+}
+for (let i = 0; i < GOAL; i++) {
+  const heart = document.createElement('span');
+  heart.textContent = '💙';
+  heartsEl.appendChild(heart);
+}
+
+function render() {
+  cupCountEl.textContent = cupCount;
+  statusLineEl.textContent = cupCount >= GOAL ? '오늘 목표 완전 클리어!' : `${GOAL - cupCount}잔 남았어요, 힘내요`;
+  cupHintEl.textContent = HINTS[Math.min(cupCount, HINTS.length - 1)];
+
+  const wraps = glassGridEl.querySelectorAll('.glass-wrap');
+  wraps.forEach((w, i) => w.classList.toggle('filled', i < cupCount));
+
+  celebrationEl.classList.toggle('show', celebrating);
+}
+
+function addCup() {
+  if (celebrating) return;
+  cupCount = Math.min(GOAL, cupCount + 1);
+  celebrating = cupCount >= GOAL;
+  render();
+}
+
+function resetToday() {
+  cupCount = 0;
+  celebrating = false;
+  render();
+}
+
+function closeCelebration() {
+  celebrating = false;
+  render();
+}
+
+document.getElementById('addCupBtn').addEventListener('click', addCup);
+document.getElementById('resetBtn1').addEventListener('click', resetToday);
+document.getElementById('resetBtn2').addEventListener('click', resetToday);
+document.getElementById('closeCelebrationBtn').addEventListener('click', closeCelebration);
+
+render();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js');
+  });
+}
+</script>
+</body>
+</html>
